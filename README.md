@@ -1,5 +1,7 @@
 # Depthweaver
 
+<img width="500px" alt="Truthound Banner" src="https://github.com/user-attachments/assets/15652a1d-6b1c-4e92-b219-2569a7e7cd3b" />
+
 > *Weaving light from the invisible depth of the web.*
 
 [![Unity](https://img.shields.io/badge/Unity-2022.3%2B%20LTS-000000?style=flat&logo=unity&logoColor=white)](https://unity.com)
