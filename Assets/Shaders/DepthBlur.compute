@@ -1,0 +1,114 @@
+// Assets/Shaders/DepthBlur.compute
+// ══════════════════════════════════════════════════════════════
+// Depthweaver — 깊이 맵 가우시안 블러 컴퓨트 셰이더
+// ══════════════════════════════════════════════════════════════
+//
+// 깊이 맵의 날카로운 직사각형 경계를 부드럽게 평활화하여
+// 변위 메시에서 시각적 아티팩트를 방지한다.
+//
+// 분리 가능 가우시안 블러 (Separable Gaussian Blur):
+//   2패스 (수평 → 수직)로 분리하여 O(n²) → O(2n)으로 최적화.
+//   5×5 가우시안 커널 (sigma ≈ 1.0) 사용.
+
+#pragma kernel BlurHorizontal
+#pragma kernel BlurVertical
+
+// ─── 입출력 텍스처 ─────────────────────────────────
+RWTexture2D<float4> Result;
+Texture2D<float4> Input;
+SamplerState samplerInput;
+
+// ─── 파라미터 ─────────────────────────────────────
+float _TexelSize;       // 1.0 / textureResolution (예: 1.0 / 512.0)
+int _KernelRadius;      // 블러 반경 (기본 2 → 5x5 커널)
+
+// ─── 가우시안 가중치 (sigma ≈ 1.0, 5탭) ──────────
+// 정규화된 가중치: 합계 = 1.0
+// [0.06136, 0.24477, 0.38774, 0.24477, 0.06136]
+static const int MAX_KERNEL_RADIUS = 5;
+static const float gaussWeights[11] = {
+    0.01222, 0.02783, 0.06559, 0.12098, 0.17467,
+    0.19742, // 중심
+    0.17467, 0.12098, 0.06559, 0.02783, 0.01222
+};
+
+// 5탭 가중치 (radius=2)
+static const float gauss5[5] = {
+    0.06136, 0.24477, 0.38774, 0.24477, 0.06136
+};
+
+// ─── 수평 블러 패스 ────────────────────────────────
+[numthreads(8, 8, 1)]
+void BlurHorizontal(uint3 id : SV_DispatchThreadID)
+{
+    float2 uv = (float2(id.xy) + 0.5) * _TexelSize;
+    float4 sum = float4(0, 0, 0, 0);
+
+    int radius = clamp(_KernelRadius, 1, MAX_KERNEL_RADIUS);
+
+    if (radius == 2)
+    {
+        // 최적화된 5탭 경로
+        [unroll]
+        for (int x = -2; x <= 2; x++)
+        {
+            float2 offset = float2(x * _TexelSize, 0);
+            sum += Input.SampleLevel(samplerInput, uv + offset, 0) * gauss5[x + 2];
+        }
+    }
+    else
+    {
+        // 일반 경로: 임의 반경
+        float weightSum = 0;
+        for (int x = -radius; x <= radius; x++)
+        {
+            float2 offset = float2(x * _TexelSize, 0);
+            int idx = x + MAX_KERNEL_RADIUS; // 배열 인덱스 매핑
+            idx = clamp(idx, 0, 10);
+            float w = gaussWeights[idx];
+            sum += Input.SampleLevel(samplerInput, uv + offset, 0) * w;
+            weightSum += w;
+        }
+        if (weightSum > 0) sum /= weightSum;
+    }
+
+    Result[id.xy] = sum;
+}
+
+// ─── 수직 블러 패스 ────────────────────────────────
+[numthreads(8, 8, 1)]
+void BlurVertical(uint3 id : SV_DispatchThreadID)
+{
+    float2 uv = (float2(id.xy) + 0.5) * _TexelSize;
+    float4 sum = float4(0, 0, 0, 0);
+
+    int radius = clamp(_KernelRadius, 1, MAX_KERNEL_RADIUS);
+
+    if (radius == 2)
+    {
+        // 최적화된 5탭 경로
+        [unroll]
+        for (int y = -2; y <= 2; y++)
+        {
+            float2 offset = float2(0, y * _TexelSize);
+            sum += Input.SampleLevel(samplerInput, uv + offset, 0) * gauss5[y + 2];
+        }
+    }
+    else
+    {
+        // 일반 경로
+        float weightSum = 0;
+        for (int y = -radius; y <= radius; y++)
+        {
+            float2 offset = float2(0, y * _TexelSize);
+            int idx = y + MAX_KERNEL_RADIUS;
+            idx = clamp(idx, 0, 10);
+            float w = gaussWeights[idx];
+            sum += Input.SampleLevel(samplerInput, uv + offset, 0) * w;
+            weightSum += w;
+        }
+        if (weightSum > 0) sum /= weightSum;
+    }
+
+    Result[id.xy] = sum;
+}
