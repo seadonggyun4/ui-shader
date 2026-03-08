@@ -1,6 +1,6 @@
 # Depthweaver
 
-<img width="500px" alt="Truthound Banner" src="https://github.com/user-attachments/assets/15652a1d-6b1c-4e92-b219-2569a7e7cd3b" />
+<img width="500px" alt="Truthound Banner" src="https://github.com/user-attachments/assets/386a11e4-8649-4903-8c77-3c36c2919d9e" />
 
 > *Weaving light from the invisible depth of the web.*
 
